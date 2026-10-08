@@ -219,6 +219,22 @@ namespace FocusFreeze.Core
         [JsonIgnore]
         public string FilePath { get; set; } = "";
 
+        /// <summary>
+        /// 配置的固定存放目录：%LOCALAPPDATA%\多动症矫正器。
+        /// 放在用户目录而不是 exe 同目录，这样重新解压、换路径、重新构建都不会丢设置。
+        /// </summary>
+        public static string UserConfigDir
+        {
+            get
+            {
+                string dir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "多动症矫正器");
+                Directory.CreateDirectory(dir);
+                return dir;
+            }
+        }
+
         private static readonly JsonSerializerOptions Opts = new JsonSerializerOptions
         {
             WriteIndented = true,
@@ -228,27 +244,30 @@ namespace FocusFreeze.Core
         public static AppConfig LoadOrCreate(string baseDir)
         {
             string assets = Path.Combine(baseDir, "assets");
-            string cfgPath = Path.Combine(baseDir, "config.json");
-
             DefaultAssets.Ensure(assets, out string png, out string wav);
 
+            // 配置固定放在用户目录；若 exe 同目录里也有 config.json，则优先沿用那一份
+            // （便携用法：把配置和 exe 放一起带着走）。
+            string portableCfg = Path.Combine(baseDir, "config.json");
+            string userCfg = Path.Combine(UserConfigDir, "config.json");
+            bool portable = File.Exists(portableCfg);
+            string cfgPath = portable ? portableCfg : userCfg;
+
             AppConfig cfg = null;
-            if (File.Exists(cfgPath))
+            foreach (string p in new[] { portable ? portableCfg : userCfg, portable ? userCfg : portableCfg })
             {
-                try
-                {
-                    cfg = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(cfgPath), Opts);
-                }
-                catch
-                {
-                    cfg = null;
-                }
+                if (cfg != null || !File.Exists(p)) continue;
+                try { cfg = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(p), Opts); }
+                catch { cfg = null; }
             }
 
             if (cfg == null) cfg = new AppConfig();
             cfg.FilePath = cfgPath;
-            if (string.IsNullOrWhiteSpace(cfg.ImagePath)) cfg.ImagePath = png;
-            if (string.IsNullOrWhiteSpace(cfg.AudioPath)) cfg.AudioPath = wav;
+            // 素材若指向的文件已经不存在（换了目录、换了机器），回退到当前目录下的默认素材。
+            if (string.IsNullOrWhiteSpace(cfg.ImagePath) || !File.Exists(cfg.ImagePath)) cfg.ImagePath = png;
+            if (string.IsNullOrWhiteSpace(cfg.AudioPath) || !File.Exists(cfg.AudioPath)) cfg.AudioPath = wav;
+            if (!string.IsNullOrWhiteSpace(cfg.CoverImagePath) && !File.Exists(cfg.CoverImagePath)) cfg.CoverImagePath = "";
+            if (!string.IsNullOrWhiteSpace(cfg.VideoPath) && !File.Exists(cfg.VideoPath)) cfg.VideoPath = "";
             if (cfg.Blacklist == null || cfg.Blacklist.Length == 0) cfg.Blacklist = new AppConfig().Blacklist;
             cfg.Sanitize();
             try { cfg.Save(); } catch { }

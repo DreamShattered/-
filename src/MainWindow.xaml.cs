@@ -29,7 +29,7 @@ namespace FocusFreeze
             App.LogLine += AppendLog;
 
             Loaded += MainWindow_Loaded;
-            Closed += delegate { _uiTimer.Stop(); _saveTimer.Stop(); App.LogLine -= AppendLog; };
+            Closed += delegate { _uiTimer.Stop(); _saveTimer.Stop(); SafeSave(); App.LogLine -= AppendLog; };
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)

@@ -306,8 +306,6 @@
                         <CheckBox x:Name="ChkSuspend" Content="触发时挂起前台进程（定格画面）"
                                   Checked="Toggle_Changed" Unchecked="Toggle_Changed" Margin="0,0,0,6" Foreground="#E8EAF0" />
                         <CheckBox x:Name="ChkSwallow" Content="定格期间屏蔽新的按键（松开事件仍会传递，游戏不会残留按键按下状态）"
-                                  Checked="Toggle_Changed" Unchecked="Toggle_Changed" Foreground="#E8EAF0" Margin="0,0,0,6" />
-                        <CheckBox x:Name="ChkAutoGameMode" Content="自动为东方风神录(th10)选择[窗口模式]（只点它自己的启动对话框，不修改游戏文件）"
                                   Checked="Toggle_Changed" Unchecked="Toggle_Changed" Foreground="#E8EAF0" Margin="0,0,0,8" />
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="定格方式：" VerticalAlignment="Center" Margin="0,0,8,0" />

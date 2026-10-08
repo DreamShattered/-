@@ -57,7 +57,6 @@ namespace FocusFreeze
             ChkEnabled.IsChecked = c.Enabled;
             ChkSuspend.IsChecked = c.SuspendForeground;
             ChkSwallow.IsChecked = c.SwallowInput;
-            ChkAutoGameMode.IsChecked = c.AutoSelectGameMode;
             CmbFreezeMode.SelectedIndex = c.FreezeMode == FreezeMode.PauseKey ? 1 : 0;
             SldWindow.Value = Clamp(c.WindowMs, SldWindow.Minimum, SldWindow.Maximum);
             SldThreshold.Value = Clamp(c.ThresholdCount, SldThreshold.Minimum, SldThreshold.Maximum);
@@ -175,10 +174,8 @@ namespace FocusFreeze
             if (_loading) return;
             App.Config.SuspendForeground = ChkSuspend.IsChecked == true;
             App.Config.SwallowInput = ChkSwallow.IsChecked == true;
-            App.Config.AutoSelectGameMode = ChkAutoGameMode.IsChecked == true;
             App.Config.CoverUntilOverlayEnds = ChkCoverUntilEnd.IsChecked == true;
             App.Config.VideoFullscreen = ChkVideoFullscreen.IsChecked == true;
-            GameLauncher.Enabled = App.Config.AutoSelectGameMode;
             ScheduleSave();
         }
 

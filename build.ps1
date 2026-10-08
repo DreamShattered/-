@@ -1,7 +1,11 @@
-﻿# 多动症矫正器 — 构建与发布脚本
+# Build / publish entry point.
 #
-#   .\build.ps1            发布 Release：自包含单文件 exe -> publish\
-#   .\build.ps1 -Debug     只构建 Debug（框架依赖，仅供本机开发调试）
+#   build.ps1           publish a self-contained single-file exe into publish\
+#   build.ps1 -Debug    debug build only (framework-dependent, fast)
+#
+# NOTE: this file is intentionally pure ASCII. Windows PowerShell 5.1 reads
+# BOM-less UTF-8 as ANSI, which turns non-ASCII source into a parse error.
+# Keep it ASCII so the script survives any editor.
 
 param([switch]$Debug)
 
@@ -10,35 +14,40 @@ $root = $PSScriptRoot
 $proj = Join-Path $root 'src\FocusFreeze.csproj'
 
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
-    throw '未找到 dotnet 命令。请先安装 .NET 8 SDK：https://dotnet.microsoft.com/download/dotnet/8.0'
+    throw 'dotnet not found. Install the .NET 8 SDK: https://dotnet.microsoft.com/download/dotnet/8.0'
 }
 if (-not (Test-Path $proj)) {
-    throw "找不到工程文件：$proj"
+    throw "Project file not found: $proj"
 }
 
 if ($Debug) {
-    Write-Host '构建 Debug（框架依赖，需要本机已装 .NET 8 Desktop Runtime）...' -ForegroundColor Cyan
+    Write-Host 'Building Debug (framework-dependent, needs .NET 8 Desktop Runtime)...' -ForegroundColor Cyan
     dotnet build $proj -c Debug -nologo
-    if ($LASTEXITCODE -ne 0) { throw "构建失败，退出码 $LASTEXITCODE" }
+    if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE" }
+    $dbgExe = Get-ChildItem (Join-Path $root 'src\bin\Debug\net8.0-windows') -Filter '*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
     Write-Host ''
-    Write-Host ('输出：' + (Join-Path $root 'src\bin\Debug\net8.0-windows\多动症矫正器.exe')) -ForegroundColor Green
+    if ($dbgExe) { Write-Host ('Output: ' + $dbgExe.FullName) -ForegroundColor Green }
     return
 }
 
 $out = Join-Path $root 'publish'
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 
-# 只清掉旧的主程序，保留同目录的使用说明、config.json 等文件
+# Remove only the old main program; keep the usage doc / config.json next to it.
 Get-ChildItem $out -Filter '*.exe' -ErrorAction SilentlyContinue | Remove-Item -Force
 
-Write-Host '发布 Release（自包含单文件）...' -ForegroundColor Cyan
+Write-Host 'Publishing Release (self-contained single file)...' -ForegroundColor Cyan
 dotnet publish $proj -c Release -o $out -nologo
-if ($LASTEXITCODE -ne 0) { throw "发布失败，退出码 $LASTEXITCODE" }
+if ($LASTEXITCODE -ne 0) { throw "Publish failed with exit code $LASTEXITCODE" }
 
 $exe = Get-ChildItem $out -Filter '*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
-if (-not $exe) { throw '发布后没有找到 exe，请检查上面的输出。' }
+if (-not $exe) { throw 'No exe produced - check the output above.' }
+
+# Ship the latest plain-text usage doc next to the exe.
+$doc = Get-ChildItem (Join-Path $root 'docs') -Filter '*.txt' -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($doc) { Copy-Item $doc.FullName (Join-Path $out $doc.Name) -Force }
 
 $mb = [math]::Round($exe.Length / 1MB, 1)
 Write-Host ''
-Write-Host ('完成：' + $exe.FullName) -ForegroundColor Green
-Write-Host "大小：$mb MB —— 自包含单文件，单独拷这一个文件到任何 64 位 Windows 上双击即可运行，目标机器无需安装 .NET 运行时。" -ForegroundColor Green
+Write-Host ('Done: ' + $exe.FullName) -ForegroundColor Green
+Write-Host "Size: $mb MB - self-contained single file. Copy this one file to any 64-bit Windows and double-click it; no .NET runtime needed." -ForegroundColor Green

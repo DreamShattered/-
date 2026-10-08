@@ -192,10 +192,6 @@ namespace FocusFreeze
             Engine.RushDetected += OnRushDetected;
             Engine.Start();
 
-            GameLauncher.Log += WriteLog;
-            GameLauncher.Enabled = Config.AutoSelectGameMode;
-            GameLauncher.Start();
-
             _overlay = new OverlayWindow();
             // 预热窗口句柄，避免首次触发时才创建 HWND 造成可见延迟。
             _overlay.Show();
@@ -254,7 +250,6 @@ namespace FocusFreeze
         {
             try
             {
-                GameLauncher.Stop();
                 ResumeAll();
                 if (Engine != null)
                 {

@@ -52,18 +52,6 @@ namespace FocusFreeze.Core
             },
             new GameProfile
             {
-                ProcessName = "th10",
-                DisplayName = "东方风神录 (D3D9)",
-                SuspendProcess = true,
-                SuspendCapSeconds = 0.0,
-                PreferredMode = FreezeMode.PauseKey,
-                Note = "必须经 Steam 启动，启动时会弹出模式选择框，需选 [ウィンドウ] 窗口模式；"
-                     + "窗口模式下 646x520、刷新率不变、覆盖层可见、GDI 可抓画面。"
-                     + "实测：ESC = 暂停/解除暂停（游戏内按 Z 五次进入对局后验证）。"
-                     + "本档案默认发送暂停键而非挂起进程。"
-            },
-            new GameProfile
-            {
                 ProcessName = "th06nc",
                 DisplayName = "东方红魔乡 新典 (D3D11 / x64)",
                 SuspendProcess = true,

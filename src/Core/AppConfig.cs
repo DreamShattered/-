@@ -191,9 +191,6 @@ namespace FocusFreeze.Core
         /// <summary>暂停键的虚拟键码，东方系列默认为 ESC (0x1B)。</summary>
         public int PauseKeyVirtualKey { get; set; } = 0x1B;
 
-        /// <summary>自动为东方风神录取 th10 选择[窗口模式]（仅点击 Th10 自己的启动对话框）。</summary>
-        public bool AutoSelectGameMode { get; set; } = false;
-
         /// <summary>定格期间强制把覆盖层压到最顶层（游戏窗口往往是 TOPMOST）。</summary>
         public bool ForceOverlayTopmost { get; set; } = true;
 

@@ -23,4 +23,21 @@
     <NoWarn>$(NoWarn);WFAC010</NoWarn>
   </PropertyGroup>
 
+  <!--
+    Release 构建直接产出「自带 .NET 运行时」的可执行文件。
+    这样无论 dotnet build -c Release 还是 dotnet publish -c Release，
+    拿到的 exe 在没装 .NET Desktop Runtime 的机器上都能直接双击运行，
+    不会再出现 "You must install .NET Desktop Runtime" 弹窗。
+    Debug 构建不受影响（仍是框架依赖），保持开发时的构建速度。
+  -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- dotnet publish 直接产出单个 exe（运行时已封进去），
+         这样分发时不可能再出现「只拷了 exe，结果缺 .NET Desktop Runtime」的情况。 -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
 </Project>

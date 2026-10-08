@@ -11,6 +11,7 @@ tools/*_out.txt
 
 # 程序运行时生成
 config.json
+config.*.json
 assets/
 selftest.txt
 probe.txt

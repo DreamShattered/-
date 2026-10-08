@@ -10,6 +10,10 @@
 *.txt     text
 *.json    text
 
+# 批处理对行尾敏感，必须 CRLF
+*.cmd     text eol=crlf
+*.bat     text eol=crlf
+
 # 二进制
 *.ico     binary
 *.png     binary

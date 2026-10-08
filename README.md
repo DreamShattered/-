@@ -31,3 +31,17 @@
 遮挡持续到展示结束（游戏已恢复但屏幕仍被挡住）
 ```
 
+---
+
+## 从源码构建
+
+需要 [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)。在仓库根目录执行：
+
+```powershell
+.\build.cmd
+```
+
+产物在 `publish\多动症矫正器.exe`，**自包含单文件** —— 单独拷这一个文件到任何 64 位 Windows 上双击就能运行，目标机器不需要安装 .NET 运行时。
+
+`build.cmd` 只是一层包装（用来绕过 Windows 默认禁止本地脚本执行的限制），等价的直接命令是 `dotnet publish src\FocusFreeze.csproj -c Release -o publish` —— Release 配置里已经写好了自包含与单文件设置，不需要再手敲那些参数。
+

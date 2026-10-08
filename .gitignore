@@ -1,0 +1,33 @@
+# 构建产物
+bin/
+obj/
+publish/
+*.zip
+
+# 调试与工具产物
+tools/evidence/
+tools/*_out.txt
+*.txt.tmp
+
+# 程序运行时生成
+config.json
+assets/
+selftest.txt
+probe.txt
+suspendprobe.txt
+swallowprobe.txt
+swallowcheck.txt
+plan.txt
+swallowprobe.ready
+
+# IDE / 编辑器
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+
+# 系统
+Thumbs.db
+desktop.ini
+.DS_Store

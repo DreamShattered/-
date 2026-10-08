@@ -1,0 +1,22 @@
+<Window x:Class="FocusFreeze.VideoWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="多动症矫正器 Video"
+        WindowStyle="None"
+        Background="Black"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Topmost="True"
+        ResizeMode="NoResize"
+        WindowStartupLocation="Manual"
+        Focusable="False">
+    <Grid>
+        <MediaElement x:Name="Player"
+                      Stretch="Uniform"
+                      LoadedBehavior="Manual"
+                      UnloadedBehavior="Manual"
+                      MediaOpened="Player_MediaOpened"
+                      MediaEnded="Player_MediaEnded"
+                      MediaFailed="Player_MediaFailed" />
+    </Grid>
+</Window>

@@ -1,0 +1,19 @@
+<Window x:Class="FocusFreeze.CoverWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="多动症矫正器 Cover"
+        WindowStyle="None"
+        Background="Black"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Topmost="True"
+        ResizeMode="NoResize"
+        WindowStartupLocation="Manual"
+        Focusable="False"
+        SnapsToDevicePixels="True">
+    <Grid>
+        <Image x:Name="Shot" Stretch="UniformToFill" Visibility="Collapsed" />
+        <Rectangle x:Name="Solid" Fill="#000000" Visibility="Collapsed" />
+        <Rectangle x:Name="Dim" Fill="#000000" Opacity="0.35" />
+    </Grid>
+</Window>

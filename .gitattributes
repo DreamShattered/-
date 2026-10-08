@@ -1,0 +1,19 @@
+# 统一按文本处理，避免 Windows 行尾把整个仓库标记成改动
+* text=auto eol=lf
+
+*.cs      text diff=csharp
+*.xaml    text
+*.csproj  text
+*.xml     text
+*.manifest text
+*.md      text
+*.txt     text
+*.json    text
+
+# 二进制
+*.ico     binary
+*.png     binary
+*.jpg     binary
+*.wav     binary
+*.mp3     binary
+*.mp4     binary

@@ -1,0 +1,342 @@
+<Window x:Class="FocusFreeze.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="多动症矫正器"
+        Height="820" Width="800"
+        MinHeight="420" MinWidth="720"
+        Background="#0F1116"
+        Foreground="#E8EAF0"
+        FontFamily="Microsoft YaHei UI"
+        FontSize="13">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- 上半部分可滚动：窗口再小也不会丢功能 -->
+        <ScrollViewer Grid.Row="0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="0,0,10,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Background="#171A21" CornerRadius="10" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="实时状态" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,10" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="当前输入速率" Foreground="#8B93A7" />
+                                <TextBlock x:Name="TxtRate" Text="0 /s" FontSize="26" FontWeight="Bold" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="键盘 / 鼠标 累计" Foreground="#8B93A7" />
+                                <TextBlock x:Name="TxtTotals" Text="0 / 0" FontSize="18" Margin="0,4,0,0" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="上次触发" Foreground="#8B93A7" />
+                                <TextBlock x:Name="TxtLast" Text="从未" FontSize="18" Margin="0,4,0,0" />
+                            </StackPanel>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                            <CheckBox x:Name="ChkEnabled" Content="启用监控" Foreground="#E8EAF0"
+                                      VerticalAlignment="Center" Margin="0,0,20,0"
+                                      Checked="ChkEnabled_Changed" Unchecked="ChkEnabled_Changed" />
+                            <Button x:Name="BtnTest" Content="立即测试一次" Click="BtnTest_Click" Padding="16,6" Margin="0,0,10,0" />
+                            <Button x:Name="BtnDefaults" Content="恢复默认参数" Click="BtnDefaults_Click" Padding="16,6" Margin="0,0,10,0" />
+                            <Button x:Name="BtnMinimize" Content="最小化并继续监控" Click="BtnMinimize_Click" Padding="16,6" />
+                        </StackPanel>
+                        <TextBlock x:Name="TxtHook" Text="钩子状态：未启动" Foreground="#8B93A7" Margin="0,10,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="1" Background="#171A21" CornerRadius="10" Padding="16" Margin="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock Text="触发参数" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,8" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="130" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="统计窗口长度" VerticalAlignment="Center" />
+                            <Slider x:Name="SldWindow" Grid.Row="0" Grid.Column="1" Minimum="200" Maximum="5000"
+                                    Value="1000" TickFrequency="100" IsSnapToTickEnabled="True"
+                                    ValueChanged="Slider_Changed" Margin="0,4" />
+                            <TextBlock x:Name="TxtWindow" Grid.Row="0" Grid.Column="2" Text="1000 ms"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="#8BEA9B" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="窗口内事件数阈值" VerticalAlignment="Center" />
+                            <Slider x:Name="SldThreshold" Grid.Row="1" Grid.Column="1" Minimum="2" Maximum="200"
+                                    Value="25" TickFrequency="1" IsSnapToTickEnabled="True"
+                                    ValueChanged="Slider_Changed" Margin="0,4" />
+                            <TextBlock x:Name="TxtThreshold" Grid.Row="1" Grid.Column="2" Text="25 次"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="#8BEA9B" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="触发后冷却时间" VerticalAlignment="Center" />
+                            <Slider x:Name="SldCooldown" Grid.Row="2" Grid.Column="1" Minimum="0" Maximum="300"
+                                    Value="20" TickFrequency="1" IsSnapToTickEnabled="True"
+                                    ValueChanged="Slider_Changed" Margin="0,4" />
+                            <TextBlock x:Name="TxtCooldown" Grid.Row="2" Grid.Column="2" Text="20 s"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="#8BEA9B" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="冻结游戏时长（越小时间差越小）" VerticalAlignment="Center" TextWrapping="Wrap" />
+                            <Slider x:Name="SldFreeze" Grid.Row="3" Grid.Column="1" Minimum="0.3" Maximum="5"
+                                    Value="1" TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                    ValueChanged="Slider_Changed" Margin="0,4" />
+                            <TextBlock x:Name="TxtFreeze" Grid.Row="3" Grid.Column="2" Text="1.0 s"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="#8BEA9B" />
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="画面垂直位置比例" VerticalAlignment="Center" />
+                            <Slider x:Name="SldYRatio" Grid.Row="4" Grid.Column="1" Minimum="0.2" Maximum="0.9"
+                                    Value="0.62" TickFrequency="0.01" IsSnapToTickEnabled="True"
+                                    ValueChanged="Slider_Changed" Margin="0,4" />
+                            <TextBlock x:Name="TxtYRatio" Grid.Row="4" Grid.Column="2" Text="0.62"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="#8BEA9B" />
+
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="展示时间偏移（跟随音频/视频）" VerticalAlignment="Center" />
+                            <Slider x:Name="SldOverlayOffset" Grid.Row="5" Grid.Column="1" Minimum="-0.5" Maximum="0.5"
+                                    Value="0" TickFrequency="0.05" IsSnapToTickEnabled="True"
+                                    ValueChanged="Slider_Changed" Margin="0,4" />
+                            <TextBlock x:Name="TxtOverlayOffset" Grid.Row="5" Grid.Column="2" Text="0.00 s"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="#8BEA9B" />
+
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="当前音频时长" VerticalAlignment="Center" />
+                            <TextBlock x:Name="TxtAudioLen" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2" Text="音频 --"
+                                       VerticalAlignment="Center" Foreground="#8BEA9B" Margin="0,6,0,4" />
+
+                            <TextBlock Grid.Row="8" Grid.Column="0" Text="按键判定方式" VerticalAlignment="Center" />
+                            <ComboBox x:Name="CmbHoldMode" Grid.Row="8" Grid.Column="1" SelectedIndex="0"
+                                      SelectionChanged="CmbHoldMode_Changed" Margin="0,4">
+                                <ComboBoxItem Content="持续按住只算一次（忽略系统自动重复）" />
+                                <ComboBoxItem Content="按住算多次（按间隔计次）" />
+                            </ComboBox>
+                            <TextBlock Grid.Row="8" Grid.Column="2" Text="" VerticalAlignment="Center" />
+
+                            <TextBlock Grid.Row="9" Grid.Column="0" Text="按住计次间隔" VerticalAlignment="Center" />
+                            <Slider x:Name="SldHoldInterval" Grid.Row="9" Grid.Column="1" Minimum="100" Maximum="2000"
+                                    Value="500" TickFrequency="50" IsSnapToTickEnabled="True"
+                                    ValueChanged="Slider_Changed" Margin="0,4" />
+                            <TextBlock x:Name="TxtHoldInterval" Grid.Row="9" Grid.Column="2" Text="500 ms"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="#8BEA9B" />
+
+                            <TextBlock Grid.Row="10" Grid.Column="0" Text="触发时遮挡画面" VerticalAlignment="Center" />
+                            <ComboBox x:Name="CmbCover" Grid.Row="10" Grid.Column="1" SelectedIndex="0"
+                                      SelectionChanged="CmbCover_Changed" Margin="0,4">
+                                <ComboBoxItem Content="不遮挡" />
+                                <ComboBoxItem Content="高斯模糊" />
+                                <ComboBoxItem Content="马赛克" />
+                                <ComboBoxItem Content="纯色遮挡" />
+                                <ComboBoxItem Content="仅暗化" />
+                                <ComboBoxItem Content="自定义背景图" />
+                            </ComboBox>
+                            <TextBlock Grid.Row="10" Grid.Column="2" Text="" VerticalAlignment="Center" />
+
+                            <TextBlock Grid.Row="11" Grid.Column="0" Text="模糊强度" VerticalAlignment="Center" />
+                            <Slider x:Name="SldBlur" Grid.Row="11" Grid.Column="1" Minimum="0" Maximum="120"
+                                    Value="28" TickFrequency="2" IsSnapToTickEnabled="True"
+                                    ValueChanged="Slider_Changed" Margin="0,4" />
+                            <TextBlock x:Name="TxtBlur" Grid.Row="11" Grid.Column="2" Text="28"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="#8BEA9B" />
+
+                            <TextBlock Grid.Row="12" Grid.Column="0" Text="马赛克块大小" VerticalAlignment="Center" />
+                            <Slider x:Name="SldPixel" Grid.Row="12" Grid.Column="1" Minimum="2" Maximum="128"
+                                    Value="16" TickFrequency="2" IsSnapToTickEnabled="True"
+                                    ValueChanged="Slider_Changed" Margin="0,4" />
+                            <TextBlock x:Name="TxtPixel" Grid.Row="12" Grid.Column="2" Text="16 px"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="#8BEA9B" />
+
+                            <TextBlock Grid.Row="13" Grid.Column="0" Text="暗化程度（可叠加）" VerticalAlignment="Center" />
+                            <Slider x:Name="SldDim" Grid.Row="13" Grid.Column="1" Minimum="0" Maximum="1"
+                                    Value="0.35" TickFrequency="0.05" IsSnapToTickEnabled="True"
+                                    ValueChanged="Slider_Changed" Margin="0,4" />
+                            <TextBlock x:Name="TxtDim" Grid.Row="13" Grid.Column="2" Text="0.35"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="#8BEA9B" />
+
+                            <TextBlock Grid.Row="14" Grid.Column="0" Text="遮挡背景图" VerticalAlignment="Center" />
+                            <TextBox x:Name="TxtCoverImage" Grid.Row="14" Grid.Column="1" Margin="0,4" Padding="4,3" TextChanged="TextField_Changed" />
+                            <Button Grid.Row="14" Grid.Column="2" Content="浏览" Click="BtnPickCoverImage_Click" Padding="12,4" Margin="6,4,0,4" />
+
+                            <TextBlock Grid.Row="15" Grid.Column="0" Text="冻结时长方式" VerticalAlignment="Center" />
+                            <ComboBox x:Name="CmbSuspendMode" Grid.Row="15" Grid.Column="1" Grid.ColumnSpan="2" SelectedIndex="0"
+                                      SelectionChanged="CmbSuspendMode_Changed" Margin="0,4">
+                                <ComboBoxItem Content="跟随音频时长（默认，用下面的偏移微调）" />
+                                <ComboBoxItem Content="固定秒数（用上面的冻结游戏时长）" />
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="17" Grid.Column="0" Text="时间偏移（跟随音频时生效）" VerticalAlignment="Center" />
+                            <Slider x:Name="SldSuspendOffset" Grid.Row="17" Grid.Column="1" Minimum="-0.5" Maximum="0.5"
+                                    Value="0" TickFrequency="0.05" IsSnapToTickEnabled="True"
+                                    ValueChanged="Slider_Changed" Margin="0,4" />
+                            <TextBlock x:Name="TxtSuspendOffset" Grid.Row="17" Grid.Column="2" Text="0.00 s"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="#8BEA9B" />
+
+                            <TextBlock Grid.Row="16" Grid.Column="0" Text="遮挡持续到展示结束" VerticalAlignment="Center" />
+                            <CheckBox x:Name="ChkCoverUntilEnd" Grid.Row="16" Grid.Column="1" Grid.ColumnSpan="2"
+                                      Content="游戏恢复后仍保持遮挡，直到音频/视频放完（防止播放期间看到局势）"
+                                      Checked="Toggle_Changed" Unchecked="Toggle_Changed" Foreground="#E8EAF0" Margin="0,8,0,4" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="2" Background="#171A21" CornerRadius="10" Padding="16" Margin="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock Text="素材" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,8" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="70" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="图片" VerticalAlignment="Center" />
+                            <TextBox x:Name="TxtImage" Grid.Row="0" Grid.Column="1" Margin="0,4" Padding="4,3" TextChanged="TextField_Changed" />
+                            <Button Grid.Row="0" Grid.Column="2" Content="浏览" Click="BtnPickImage_Click" Padding="12,4" Margin="6,4,0,4" />
+                            <Button Grid.Row="0" Grid.Column="3" Content="预览" Click="BtnPreviewImage_Click" Padding="12,4" Margin="6,4,0,4" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="音频" VerticalAlignment="Center" />
+                            <TextBox x:Name="TxtAudio" Grid.Row="1" Grid.Column="1" Margin="0,4" Padding="4,3" TextChanged="TextField_Changed" />
+                            <Button Grid.Row="1" Grid.Column="2" Content="浏览" Click="BtnPickAudio_Click" Padding="12,4" Margin="6,4,0,4" />
+                            <Button Grid.Row="1" Grid.Column="3" Content="试听" Click="BtnPreviewAudio_Click" Padding="12,4" Margin="6,4,0,4" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="图片文案" VerticalAlignment="Center" />
+                            <TextBox x:Name="TxtCaption" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,4" Padding="4,3" TextChanged="TextField_Changed" />
+                            <StackPanel Grid.Row="2" Grid.Column="3" Orientation="Horizontal" Margin="6,4,0,4">
+                                <TextBlock Text="音量" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <Slider x:Name="SldVolume" Width="80" Minimum="0" Maximum="1" Value="0.85"
+                                        TickFrequency="0.05" IsSnapToTickEnabled="True" ValueChanged="Slider_Changed"
+                                        VerticalAlignment="Center" />
+                            </StackPanel>
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="素材来源" VerticalAlignment="Center" />
+                            <ComboBox x:Name="CmbAssetSource" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" SelectedIndex="0"
+                                      SelectionChanged="CmbAssetSource_Changed" Margin="0,6,0,4">
+                                <ComboBoxItem Content="固定文件（用上面指定的图片与音频）" />
+                                <ComboBoxItem Content="文件夹随机（洗牌轮换，一轮内不重复）" />
+                                <ComboBoxItem Content="文件夹顺序（按名称循环）" />
+                            </ComboBox>
+                            <TextBlock x:Name="TxtAssetCount" Grid.Row="3" Grid.Column="3" Text=""
+                                       VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="#8BEA9B" Margin="6,0,0,0" />
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="图片文件夹" VerticalAlignment="Center" />
+                            <TextBox x:Name="TxtImageFolder" Grid.Row="4" Grid.Column="1" Margin="0,4" Padding="4,3" TextChanged="TextField_Changed" />
+                            <Button Grid.Row="4" Grid.Column="2" Content="浏览" Click="BtnPickImageFolder_Click" Padding="12,4" Margin="6,4,0,4" />
+                            <Button Grid.Row="4" Grid.Column="3" Content="重扫" Click="BtnRescanAssets_Click" Padding="12,4" Margin="6,4,0,4" />
+
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="音频文件夹" VerticalAlignment="Center" />
+                            <TextBox x:Name="TxtAudioFolder" Grid.Row="5" Grid.Column="1" Margin="0,4" Padding="4,3" TextChanged="TextField_Changed" />
+                            <Button Grid.Row="5" Grid.Column="2" Content="浏览" Click="BtnPickAudioFolder_Click" Padding="12,4" Margin="6,4,0,4" />
+
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="配对方式" VerticalAlignment="Center" />
+                            <ComboBox x:Name="CmbPairing" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2" SelectedIndex="1"
+                                      SelectionChanged="CmbPairing_Changed" Margin="0,4">
+                                <ComboBoxItem Content="同名配对（A.png 配 A.mp3）" />
+                                <ComboBoxItem Content="按顺序配对（第 N 张配第 N 个）" />
+                                <ComboBoxItem Content="不配对（图片与音频各自独立选取）" />
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="7" Grid.Column="0" Text="素材类型" VerticalAlignment="Center" />
+                            <ComboBox x:Name="CmbAssetKind" Grid.Row="7" Grid.Column="1" Grid.ColumnSpan="2" SelectedIndex="0"
+                                      SelectionChanged="CmbAssetKind_Changed" Margin="0,6,0,4">
+                                <ComboBoxItem Content="图片 + 音频（可配对）" />
+                                <ComboBoxItem Content="视频（画面与声音都来自视频，无需配对）" />
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="8" Grid.Column="0" Text="视频文件" VerticalAlignment="Center" />
+                            <TextBox x:Name="TxtVideo" Grid.Row="8" Grid.Column="1" Margin="0,4" Padding="4,3" TextChanged="TextField_Changed" />
+                            <Button Grid.Row="8" Grid.Column="2" Content="浏览" Click="BtnPickVideo_Click" Padding="12,4" Margin="6,4,0,4" />
+                            <CheckBox x:Name="ChkVideoFullscreen" Grid.Row="8" Grid.Column="3" Content="全屏播放"
+                                      Checked="Toggle_Changed" Unchecked="Toggle_Changed" Foreground="#E8EAF0" Margin="6,0,0,0" VerticalAlignment="Center" />
+
+                            <TextBlock Grid.Row="9" Grid.Column="0" Text="视频文件夹" VerticalAlignment="Center" />
+                            <TextBox x:Name="TxtVideoFolder" Grid.Row="9" Grid.Column="1" Margin="0,4" Padding="4,3" TextChanged="TextField_Changed" />
+                            <Button Grid.Row="9" Grid.Column="2" Content="浏览" Click="BtnPickVideoFolder_Click" Padding="12,4" Margin="6,4,0,4" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="3" Background="#171A21" CornerRadius="10" Padding="16" Margin="0,12,0,12">
+                    <StackPanel>
+                        <TextBlock Text="行为开关" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,8" />
+                        <CheckBox x:Name="ChkSuspend" Content="触发时挂起前台进程（定格画面）"
+                                  Checked="Toggle_Changed" Unchecked="Toggle_Changed" Margin="0,0,0,6" Foreground="#E8EAF0" />
+                        <CheckBox x:Name="ChkSwallow" Content="定格期间屏蔽新的按键（松开事件仍会传递，游戏不会残留按键按下状态）"
+                                  Checked="Toggle_Changed" Unchecked="Toggle_Changed" Foreground="#E8EAF0" Margin="0,0,0,6" />
+                        <CheckBox x:Name="ChkAutoGameMode" Content="自动为东方风神录(th10)选择[窗口模式]（只点它自己的启动对话框，不修改游戏文件）"
+                                  Checked="Toggle_Changed" Unchecked="Toggle_Changed" Foreground="#E8EAF0" Margin="0,0,0,8" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="定格方式：" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <ComboBox x:Name="CmbFreezeMode" Width="340" SelectedIndex="0" SelectionChanged="CmbFreezeMode_Changed">
+                                <ComboBoxItem Content="挂起进程（定格当前这一帧）" />
+                                <ComboBoxItem Content="发送暂停键（游戏内暂停，更保险）" />
+                            </ComboBox>
+                        </StackPanel>
+                        <TextBlock Text="安全阀：定格期间按 ESC 立即恢复。注意：独立全屏模式（DirectX 独占全屏）的游戏被挂起可能触发显卡驱动超时复位，并可能被反作弊判定为异常。窗口化 / 无边框窗口化下表现稳定。"
+                                   Foreground="#C9A227" TextWrapping="Wrap" Margin="0,10,0,0" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+
+        <!-- 日志固定在底部 -->
+        <Border Grid.Row="1" Background="#171A21" CornerRadius="10" Padding="16" Margin="0,12,0,0" Height="180">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Text="运行日志" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,8" />
+                <TextBox x:Name="TxtLog" Grid.Row="1" IsReadOnly="True" AcceptsReturn="True"
+                         TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Auto"
+                         Background="#0B0D12" Foreground="#9AE6B4"
+                         FontFamily="Consolas" FontSize="12" Padding="8" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

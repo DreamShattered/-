@@ -80,6 +80,13 @@ namespace FocusFreeze.Core
         /// <summary>定格期间按下 ESC 即置位，用于提前结束本次定格（安全阀）。</summary>
         public volatile bool PanicRequested;
 
+        /// <summary>
+        /// 在这个时刻（Stopwatch 时间戳）之前，收到的 ESC 不当作安全阀。
+        /// 用来屏蔽本程序自己注入的暂停键及其在钩子链里的回波 ——
+        /// 否则刚把暂停键发出去，定格就被自己的按键提前结束了。
+        /// </summary>
+        public long SuppressPanicUntilTicks;
+
         /// <summary>进入定格后为 true：不计数、不写入滑动窗口，避免恢复后立刻重复触发。</summary>
         public bool Paused
         {
@@ -222,7 +229,9 @@ namespace FocusFreeze.Core
                                 // （宏、输入法、屏幕键盘等）不该把定格提前结束。
                                 const uint LLKHF_INJECTED = 0x10;
                                 bool byOtherProgram = (info.flags & LLKHF_INJECTED) != 0;
-                                if (info.vkCode == 0x1B && !byOtherProgram) PanicRequested = true;
+                                bool suppressed = Stopwatch.GetTimestamp() < SuppressPanicUntilTicks;
+                                if (info.vkCode == 0x1B && !byOtherProgram && !suppressed)
+                                    PanicRequested = true;
                                 return new IntPtr(1);
                             }
                         }

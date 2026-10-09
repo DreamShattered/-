@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace FocusFreeze.Core
 {
@@ -312,6 +313,31 @@ namespace FocusFreeze.Core
         [DllImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern int GetWindowTextLengthW(IntPtr hWnd);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern int GetWindowTextW(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+        /// <summary>取窗口标题，用于日志里说清「按键到底发给了谁」。</summary>
+        public static string WindowTitle(IntPtr hwnd)
+        {
+            if (hwnd == IntPtr.Zero || !IsWindow(hwnd)) return "(无窗口)";
+            try
+            {
+                int len = GetWindowTextLengthW(hwnd);
+                if (len <= 0) return "(无标题)";
+                StringBuilder sb = new StringBuilder(len + 2);
+                GetWindowTextW(hwnd, sb, sb.Capacity);
+                string s = sb.ToString().Trim();
+                return s.Length == 0 ? "(无标题)" : s;
+            }
+            catch
+            {
+                return "(读取失败)";
+            }
+        }
 
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo,

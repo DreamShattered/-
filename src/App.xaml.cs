@@ -587,7 +587,17 @@ namespace FocusFreeze
                 return false;
             }
 
-            if (Native.GetForegroundWindow() != e.ForegroundHwnd)
+            // 诊断：说清按键究竟会落到哪个窗口上。前台与目标不一致时无论如何都记一条，
+            // 这样「按了没反应」时能一眼看出键是不是发错了地方。
+            IntPtr fgNow = Native.GetForegroundWindow();
+            if (_logFile != null || fgNow != e.ForegroundHwnd)
+            {
+                WriteLog("暂停键目标=" + Native.WindowTitle(e.ForegroundHwnd)
+                         + "；发键时前台=" + Native.WindowTitle(fgNow));
+            }
+
+            IntPtr restoreFg = IntPtr.Zero;
+            if (fgNow != e.ForegroundHwnd)
             {
                 if (!allowRefocus)
                 {
@@ -601,6 +611,8 @@ namespace FocusFreeze
                     WriteLog("无法把目标切回前台，未能发送暂停键 —— 请在游戏里自行按暂停键。");
                     return false;
                 }
+                // 记下原前台，发完键还回去：否则每次触发都会把焦点从用户手上抢走。
+                restoreFg = fgNow;
                 // 给前台切换留出稳定时间，再发按键。异步等待，不阻塞界面线程。
                 await System.Threading.Tasks.Task.Delay(150);
             }
@@ -608,12 +620,25 @@ namespace FocusFreeze
             // 按下 → 按住一小段 → 抬起：DirectInput 游戏靠轮询读键，
             // 「按下即抬起」很可能被整个漏掉。
             ushort vk = (ushort)Config.PauseKeyVirtualKey;
+
+            // 发键前后屏蔽安全阀：注入的按键（以及它在钩子链里的回波）不应把定格提前结束。
+            // 用户在这段时间之后按 ESC 仍然照常生效。
+            Engine.SuppressPanicUntilTicks = Stopwatch.GetTimestamp()
+                                             + (long)(0.6 * Stopwatch.Frequency);
+
             Native.SendKeyEvent(vk, false);
             if (Config.PauseKeyHoldMs > 0) await System.Threading.Tasks.Task.Delay(Config.PauseKeyHoldMs);
             Native.SendKeyEvent(vk, true);
 
             // 给游戏留出处理这次按键的时间，之后才轮到遮挡与素材显示。
             if (Config.PauseKeySettleMs > 0) await System.Threading.Tasks.Task.Delay(Config.PauseKeySettleMs);
+
+            // 把前台还给原来的窗口：我们只是为了把键送进去才临时切走了一下。
+            if (restoreFg != IntPtr.Zero && Native.IsWindow(restoreFg))
+            {
+                try { Native.ForceForegroundWindow(restoreFg); } catch { }
+            }
+
             return true;
         }
 

@@ -198,6 +198,16 @@ namespace FocusFreeze.Core
         /// <summary>暂停键的虚拟键码，东方系列默认为 ESC (0x1B)。</summary>
         public int PauseKeyVirtualKey { get; set; } = 0x1B;
 
+        /// <summary>
+        /// 发送暂停键时按住多少毫秒再抬起。
+        /// DirectInput 游戏靠轮询读取键盘状态，「按下后立刻抬起」（间隔不到 1 毫秒）
+        /// 很可能被整个漏掉，所以必须按住一小段时间。
+        /// </summary>
+        public int PauseKeyHoldMs { get; set; } = 60;
+
+        /// <summary>暂停键发出后、显示遮挡之前额外等待的毫秒数，留给游戏处理这次按键。</summary>
+        public int PauseKeySettleMs { get; set; } = 120;
+
         /// <summary>定格期间强制把覆盖层压到最顶层（游戏窗口往往是 TOPMOST）。</summary>
         public bool ForceOverlayTopmost { get; set; } = true;
 

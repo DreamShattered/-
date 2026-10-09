@@ -218,7 +218,11 @@ namespace FocusFreeze.Core
                             // 直到用户再按一次才解除。
                             if (isDown)
                             {
-                                if (info.vkCode == 0x1B) PanicRequested = true; // VK_ESCAPE 安全阀
+                                // 安全阀只认「用户亲手按的」ESC：别的程序注入的 ESC
+                                // （宏、输入法、屏幕键盘等）不该把定格提前结束。
+                                const uint LLKHF_INJECTED = 0x10;
+                                bool byOtherProgram = (info.flags & LLKHF_INJECTED) != 0;
+                                if (info.vkCode == 0x1B && !byOtherProgram) PanicRequested = true;
                                 return new IntPtr(1);
                             }
                         }

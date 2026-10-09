@@ -339,6 +339,34 @@ namespace FocusFreeze
                 Engine.Paused = true;
                 Engine.ResetWindow();
 
+                // 游戏档案：按前台进程选择策略（是否挂起、推荐方式）。
+                GameProfile profile = GameProfiles.Match(e.ForegroundProcess, Config.GameProfiles);
+
+                // 界面上的「定格方式」是用户的明确选择，永远优先。
+                // 档案里的实测推荐只用来提示，不再覆盖用户选择 ——
+                // 否则在界面上选了「发送暂停键」，命中档案的游戏却依然会去挂起进程。
+                FreezeMode effectiveMode = Config.FreezeMode;
+                if (!string.IsNullOrEmpty(profile.ProcessName) && profile.PreferredMode != effectiveMode)
+                {
+                    WriteLog("提示：" + profile.ProcessName + " 的实测推荐定格方式是「"
+                             + (profile.PreferredMode == FreezeMode.PauseKey ? "发送暂停键" : "挂起进程")
+                             + "」，当前按你的设置使用「"
+                             + (effectiveMode == FreezeMode.PauseKey ? "发送暂停键" : "挂起进程") + "」。");
+                }
+
+                // 「发送暂停键」必须最先做完，且早于抓屏与遮挡：
+                // 一来按键要按住几十毫秒才被 DirectInput 游戏轮询到，
+                // 二来遮挡/覆盖层窗口一旦出现就会抢前台，键就发不进游戏了。
+                bool usePauseKey = effectiveMode == FreezeMode.PauseKey;
+                if (usePauseKey)
+                {
+                    _pausedByKey = await SendPauseKey(e, false);
+                    if (!_pausedByKey)
+                    {
+                        WriteLog("暂停键未能发送，本次只展示素材、不对游戏进程做任何干预。");
+                    }
+                }
+
                 // 遮挡层用的画面必须在游戏被冻结之前抓，才是「触发那一刻」的样子。
                 // 只有以画面为底的方式才抓屏；纯色与自定义背景图完全不抓（输入画面不出内存）。
                 BitmapSource coverShot = null;
@@ -348,9 +376,6 @@ namespace FocusFreeze
                 {
                     coverShot = ScreenCapturer.CaptureScreen();
                 }
-
-                // 游戏档案：按前台进程选择策略（是否挂起、推荐方式）。
-                GameProfile profile = GameProfiles.Match(e.ForegroundProcess, Config.GameProfiles);
 
                 // 逐个挑选本次要用的素材（支持文件夹轮换与配对）。
                 string imagePath;
@@ -389,18 +414,6 @@ namespace FocusFreeze
                 if (suspendSeconds < 0.2) suspendSeconds = 0.2;
                 if (overlaySeconds < suspendSeconds) overlaySeconds = suspendSeconds;
 
-                // 界面上的「定格方式」是用户的明确选择，永远优先。
-                // 档案里的实测推荐只用来提示，不再覆盖用户选择 ——
-                // 否则在界面上选了「发送暂停键」，命中档案的游戏却依然会去挂起进程。
-                FreezeMode effectiveMode = Config.FreezeMode;
-                if (!string.IsNullOrEmpty(profile.ProcessName) && profile.PreferredMode != effectiveMode)
-                {
-                    WriteLog("提示：" + profile.ProcessName + " 的实测推荐定格方式是「"
-                             + (profile.PreferredMode == FreezeMode.PauseKey ? "发送暂停键" : "挂起进程")
-                             + "」，当前按你的设置使用「"
-                             + (effectiveMode == FreezeMode.PauseKey ? "发送暂停键" : "挂起进程") + "」。");
-                }
-
                 if (!string.IsNullOrEmpty(profile.DisplayName))
                 {
                     WriteLog("命中游戏档案：" + profile.DisplayName
@@ -409,17 +422,8 @@ namespace FocusFreeze
                              + (effectiveMode == FreezeMode.PauseKey ? "发送暂停键" : "挂起进程") + "）");
                 }
 
-                bool usePauseKey = effectiveMode == FreezeMode.PauseKey;
-                if (usePauseKey)
-                {
-                    // 只有确认发出去了才认为游戏已暂停；否则恢复时不会去多发一次解除键。
-                    _pausedByKey = await SendPauseKey(e, false);
-                    if (!_pausedByKey)
-                    {
-                        WriteLog("暂停键未能发送，本次只展示素材、不对游戏进程做任何干预。");
-                    }
-                }
-                else if (allowSuspend && profile.SuspendProcess)
+                // 暂停键已经在前面发过了（必须在遮挡出现之前）；这里只处理挂起路径。
+                if (!usePauseKey && allowSuspend && profile.SuspendProcess)
                 {
                     suspended = TrySuspend(e, out handle);
                 }
@@ -471,7 +475,9 @@ namespace FocusFreeze
                 {
                     if (Engine.PanicRequested)
                     {
-                        WriteLog("检测到 ESC，提前结束冻结。");
+                        WriteLog("检测到 ESC，提前结束冻结。"
+                                 + "（如果你并没有按 ESC，请把这一行连同上面的 [计时] 一起反馈 —— "
+                                 + "可能是系统里有别的程序在发 ESC。）");
                         break;
                     }
                     await System.Threading.Tasks.Task.Delay(50);
@@ -593,7 +599,15 @@ namespace FocusFreeze
                 await System.Threading.Tasks.Task.Delay(80);
             }
 
-            Native.TapKey((ushort)Config.PauseKeyVirtualKey);
+            // 按下 → 按住一小段 → 抬起：DirectInput 游戏靠轮询读键，
+            // 「按下即抬起」很可能被整个漏掉。
+            ushort vk = (ushort)Config.PauseKeyVirtualKey;
+            Native.SendKeyEvent(vk, false);
+            if (Config.PauseKeyHoldMs > 0) await System.Threading.Tasks.Task.Delay(Config.PauseKeyHoldMs);
+            Native.SendKeyEvent(vk, true);
+
+            // 给游戏留出处理这次按键的时间，之后才轮到遮挡与素材显示。
+            if (Config.PauseKeySettleMs > 0) await System.Threading.Tasks.Task.Delay(Config.PauseKeySettleMs);
             return true;
         }
 

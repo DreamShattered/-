@@ -71,8 +71,16 @@ namespace FocusFreeze.Core
             IntPtr hwnd = GetForegroundWindow();
             int pid = 0;
             if (hwnd != IntPtr.Zero) GetWindowThreadProcessId(hwnd, out pid);
+            bool fgElevated = pid > 0 && pid != Environment.ProcessId && Native.IsProcessElevated(pid);
             sb.AppendLine("当前前台窗口：0x" + hwnd.ToInt64().ToString("X") + " / pid=" + pid
-                        + " / " + SafeProcessName(pid));
+                        + " / " + SafeProcessName(pid)
+                        + (fgElevated ? " / 提权=是" : ""));
+            if (fgElevated && !IsElevated())
+            {
+                sb.AppendLine("  注意：前台进程以管理员身份运行，而本程序未提权。"
+                            + "它的键鼠事件收不到（UIPI），OpenProcess 挂起也会被拒绝。"
+                            + "请以管理员身份重新运行本程序。");
+            }
 
             IntPtr probe = IntPtr.Zero;
             bool canOpen = false;

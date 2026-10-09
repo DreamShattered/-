@@ -56,6 +56,10 @@ namespace FocusFreeze.Core
         private long _lastForeignTicks;
         private bool _hasForeign;
 
+        // 前台进程是否以管理员权限运行（按 pid 缓存，避免每次评估都去开令牌）。
+        private int _elevCheckedPid = -1;
+        private bool _elevResult;
+
         // 按键状态机：0-255 = 键盘虚拟键，256+ = 鼠标按键与滚轮。
         // 用来把「真实按下」和「系统自动重复」区分开，并支持按住计次。
         private const int SlotCount = 264;
@@ -101,6 +105,16 @@ namespace FocusFreeze.Core
         }
 
         public int HookError { get { return _hookError; } }
+
+        /// <summary>
+        /// 当前前台进程是否以管理员权限运行。
+        /// 提权进程的键盘输入不会被未提权的低层钩子看到（UIPI），
+        /// 据此可以提前给出「请以管理员身份重启本程序」的提示。
+        /// </summary>
+        public bool ForegroundElevated { get { return _elevResult; } }
+
+        /// <summary>最近一次记录到的外部前台进程 pid（0 表示尚无）。</summary>
+        public int ForegroundPid { get { return _lastForeignPid; } }
         public long KeyTotal { get { return Interlocked.Read(ref _keyTotal); } }
         public long MouseTotal { get { return Interlocked.Read(ref _mouseTotal); } }
         public int LastRatePerSecond { get; private set; }
@@ -499,6 +513,12 @@ namespace FocusFreeze.Core
                 _lastForeignPid = pid;
                 _lastForeignTicks = Stopwatch.GetTimestamp();
                 _hasForeign = true;
+
+                if (pid != _elevCheckedPid)
+                {
+                    _elevCheckedPid = pid;
+                    _elevResult = Native.IsProcessElevated(pid);
+                }
             }
             catch
             {

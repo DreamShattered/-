@@ -27,6 +27,11 @@ namespace FocusFreeze.Core
 
         public const uint PROCESS_SUSPEND_RESUME = 0x0800;
 
+        // 查询进程是否提权所需要的最小权限：即使目标是提权进程，本程序未提权也能打开它读令牌。
+        public const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+        public const uint TOKEN_QUERY = 0x0008;
+        public const int TokenElevation = 20;
+
         public const int GWL_EXSTYLE = -20;
         public const int WS_EX_TRANSPARENT = 0x00000020;
         public const int WS_EX_LAYERED = 0x00080000;
@@ -134,6 +139,48 @@ namespace FocusFreeze.Core
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool CloseHandle(IntPtr hObject);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool OpenProcessToken(IntPtr ProcessHandle, uint DesiredAccess, out IntPtr TokenHandle);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool GetTokenInformation(IntPtr TokenHandle, int TokenInformationClass,
+            IntPtr TokenInformation, int TokenInformationLength, out int ReturnLength);
+
+        /// <summary>
+        /// 判断某个进程是否以管理员权限（提升的令牌）运行。
+        /// 用 PROCESS_QUERY_LIMITED_INFORMATION 打开，即使对方已提权、而本程序没提权，
+        /// 也能读到它的令牌，因此可以提前发现「前台是提权程序」这种会静默失效的情形。
+        /// </summary>
+        public static bool IsProcessElevated(int pid)
+        {
+            if (pid <= 0) return false;
+            IntPtr h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+            if (h == IntPtr.Zero) return false;
+            IntPtr token = IntPtr.Zero;
+            try
+            {
+                if (!OpenProcessToken(h, TOKEN_QUERY, out token) || token == IntPtr.Zero) return false;
+                int len;
+                GetTokenInformation(token, TokenElevation, IntPtr.Zero, 0, out len);
+                if (len <= 0) return false;
+                IntPtr buf = Marshal.AllocHGlobal(len);
+                try
+                {
+                    if (!GetTokenInformation(token, TokenElevation, buf, len, out len)) return false;
+                    return Marshal.ReadInt32(buf) != 0;
+                }
+                finally { Marshal.FreeHGlobal(buf); }
+            }
+            catch { return false; }
+            finally
+            {
+                if (token != IntPtr.Zero) CloseHandle(token);
+                CloseHandle(h);
+            }
+        }
 
         [DllImport("ntdll.dll", SetLastError = true)]
         public static extern uint NtSuspendProcess(IntPtr processHandle);

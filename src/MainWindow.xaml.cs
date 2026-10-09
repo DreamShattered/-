@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Threading;
 using FocusFreeze.Core;
@@ -11,6 +12,10 @@ namespace FocusFreeze
     {
         private readonly DispatcherTimer _uiTimer;
         private readonly DispatcherTimer _saveTimer;
+
+        // 自己是否以管理员权限运行：未提权时，提权程序的输入收不到、也挂不起它。
+        private readonly bool _selfElevated = Native.IsProcessElevated(Environment.ProcessId);
+        private bool _privWarned;
         private readonly List<string> _logLines = new List<string>();
         private bool _loading = true;
 
@@ -200,12 +205,71 @@ namespace FocusFreeze
 
             TxtRate.Text = eng.LastRatePerSecond + " /s";
             TxtTotals.Text = eng.KeyTotal + " / " + eng.MouseTotal;
+            UpdatePrivilegeHint();
 
             if (App.LastTrigger.HasValue)
             {
                 TimeSpan ago = DateTime.Now - App.LastTrigger.Value;
                 TxtLast.Text = App.LastTrigger.Value.ToString("HH:mm:ss")
                              + "（" + (int)ago.TotalSeconds + " 秒前）";
+            }
+        }
+
+        /// <summary>
+        /// 前台程序若以管理员权限运行，未提权的低层钩子看不到它的输入（UIPI），
+        /// 挂起它也会被 OpenProcess 拒绝 —— 这两种失效都是静默的，所以主动提示出来。
+        /// </summary>
+        private void UpdatePrivilegeHint()
+        {
+            if (_selfElevated)
+            {
+                if (TxtPriv.Text.Length != 0) TxtPriv.Text = "";
+                return;
+            }
+
+            MonitorEngine eng = App.Engine;
+            if (eng == null || !eng.ForegroundElevated)
+            {
+                if (TxtPriv.Text.Length != 0) TxtPriv.Text = "";
+                return;
+            }
+
+            if (TxtPriv.Text.Length == 0)
+            {
+                TxtPriv.Text = "前台程序正以管理员身份运行，而本程序未提权：它的键盘/鼠标事件收不到，"
+                             + "也无法挂起它。请点右边的「以管理员身份重启」。";
+            }
+            if (!_privWarned)
+            {
+                _privWarned = true;
+                AppendLog("检测到前台程序以管理员身份运行，而本程序未提权：低层钩子收不到它的输入，"
+                        + "OpenProcess(PROCESS_SUSPEND_RESUME) 也会被拒绝。请以管理员身份重启本程序。");
+            }
+        }
+
+        private void BtnElevate_Click(object sender, RoutedEventArgs e)
+        {
+            string exe = Environment.ProcessPath;
+            if (string.IsNullOrEmpty(exe))
+            {
+                AppendLog("无法确定程序路径，提权重启已取消。");
+                return;
+            }
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = exe,
+                    UseShellExecute = true,
+                    Verb = "runas"   // 触发 UAC 提权
+                };
+                Process.Start(psi);
+                AppendLog("已请求以管理员身份重启，本窗口即将关闭。");
+                Application.Current.Shutdown();
+            }
+            catch (Exception ex)
+            {
+                AppendLog("提权启动被取消或失败：" + ex.Message);
             }
         }
 

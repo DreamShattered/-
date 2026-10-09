@@ -519,6 +519,14 @@ namespace FocusFreeze
             }
             finally
             {
+                // 先让游戏把恢复后的第一帧画出来，再撤遮挡：挂起/恢复 D3D 程序
+                // 会让部分录屏软件的捕获管线拿不到新帧，若「恢复」「撤遮挡」挤在
+                // 同一瞬间，录像里会出现「画面停在结束那一刻较久」的现象。
+                if (Config.CoverHideDelayMs > 0)
+                {
+                    try { await System.Threading.Tasks.Task.Delay(Config.CoverHideDelayMs); } catch { }
+                }
+
                 _overlay.HideNotice();
                 _cover.HideCover();
                 _video.HideVideo();

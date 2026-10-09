@@ -131,6 +131,14 @@ namespace FocusFreeze.Core
         public bool ForceRedrawAfterResume { get; set; } = true;
 
         /// <summary>
+        /// 游戏恢复之后、撤掉遮挡之前额外等待的毫秒数。
+        /// 挂起/恢复 D3D 程序会让部分录屏软件的捕获管线拿不到新帧，从而把最后一帧
+        /// 重复较久；把「恢复重绘」和「撤遮挡」错开，能让捕获管线重新跟上。
+        /// 0 表示不等待。
+        /// </summary>
+        public int CoverHideDelayMs { get; set; } = 300;
+
+        /// <summary>
         /// 恢复后是否额外发送一个「尺寸不变的 WM_SIZE」。
         /// 它会促使游戏重建 D3D 交换链，能修好个别程序恢复后画面停死的问题，
         /// 但代价是恢复瞬间一次短促掉帧 —— 同时在录屏时尤其明显，故默认关闭。

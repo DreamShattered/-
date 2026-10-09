@@ -412,8 +412,12 @@ namespace FocusFreeze
                 bool usePauseKey = effectiveMode == FreezeMode.PauseKey;
                 if (usePauseKey)
                 {
-                    SendPauseKey(e, false);
-                    _pausedByKey = true;
+                    // 只有确认发出去了才认为游戏已暂停；否则恢复时不会去多发一次解除键。
+                    _pausedByKey = await SendPauseKey(e, false);
+                    if (!_pausedByKey)
+                    {
+                        WriteLog("暂停键未能发送，本次只展示素材、不对游戏进程做任何干预。");
+                    }
                 }
                 else if (allowSuspend && profile.SuspendProcess)
                 {
@@ -455,8 +459,11 @@ namespace FocusFreeze
                 if (_logFile != null) WriteLog("[计时] 覆盖层就绪 " + tShow + " ms");
 
                 string proc = string.IsNullOrEmpty(e.ForegroundProcess) ? "(未知)" : e.ForegroundProcess;
-                WriteLog(string.Format("[{0:HH:mm:ss}] 触发 {1} 次 / {2} ms | 前台 {3} (pid {4}) | 冻结 {5}",
-                    DateTime.Now, e.Events, e.WindowMs, proc, e.ForegroundPid, suspended ? "成功" : "跳过"));
+                string freezeNote = usePauseKey
+                    ? (_pausedByKey ? "已发送暂停键" : "暂停键未发送")
+                    : (suspended ? "挂起成功" : "未挂起");
+                WriteLog(string.Format("[{0:HH:mm:ss}] 触发 {1} 次 / {2} ms | 前台 {3} (pid {4}) | {5}",
+                    DateTime.Now, e.Events, e.WindowMs, proc, e.ForegroundPid, freezeNote));
 
                 // 阶段一：只冻结很短一段时间，把游戏的时间差压到最小。
                 DateTime freezeDeadline = DateTime.UtcNow.AddSeconds(suspendSeconds);
@@ -487,8 +494,9 @@ namespace FocusFreeze
                 if (Config.Cover != CoverMode.None && !Config.CoverUntilOverlayEnds) _cover.HideCover();
                 if (_pausedByKey)
                 {
-                    SendPauseKey(e, true);
-                    _pausedByKey = false;
+                    // 只有成功发出解除键才清除标记，否则下次仍会重试，
+                    // 避免游戏永远停在暂停状态。
+                    if (await SendPauseKey(e, true)) _pausedByKey = false;
                 }
                 Engine.Paused = false;
 
@@ -519,21 +527,12 @@ namespace FocusFreeze
             }
             finally
             {
-                // 先让游戏把恢复后的第一帧画出来，再撤遮挡：挂起/恢复 D3D 程序
-                // 会让部分录屏软件的捕获管线拿不到新帧，若「恢复」「撤遮挡」挤在
-                // 同一瞬间，录像里会出现「画面停在结束那一刻较久」的现象。
-                if (Config.CoverHideDelayMs > 0)
-                {
-                    try { await System.Threading.Tasks.Task.Delay(Config.CoverHideDelayMs); } catch { }
-                }
-
                 _overlay.HideNotice();
                 _cover.HideCover();
                 _video.HideVideo();
                 if (_pausedByKey)
                 {
-                    SendPauseKey(e, true);
-                    _pausedByKey = false;
+                    if (await SendPauseKey(e, true)) _pausedByKey = false;
                 }
                 if (handle != IntPtr.Zero)
                 {
@@ -556,21 +555,26 @@ namespace FocusFreeze
 
         /// <summary>
         /// 向游戏发送暂停键（东方系列为 ESC = ポーズ／ポーズ解除）。
+        /// 返回是否「真的发出去了」—— 只有成功发送才应认为游戏已进入/退出暂停。
         ///
         /// 安全约束：只在目标窗口仍然存在、且（进入时）仍是前台窗口的前提下发送，
         /// 绝不向无关程序发按键；也不做任何会导致游戏窗口关闭的操作。
+        ///
+        /// 注入的按键带 Native.InjectedTag 标记，自己的低层钩子会认出它并直接放行：
+        /// 既不会被定格期间的吞键逻辑吃掉（那样游戏收不到暂停指令），
+        /// 也不会被误判成用户按下 ESC 而提前结束定格。
         /// </summary>
-        private void SendPauseKey(RushEventArgs e, bool allowRefocus)
+        private async System.Threading.Tasks.Task<bool> SendPauseKey(RushEventArgs e, bool allowRefocus)
         {
             if (Config.PauseKeyVirtualKey <= 0)
             {
                 WriteLog("暂停键未配置，跳过。");
-                return;
+                return false;
             }
             if (e.ForegroundHwnd == IntPtr.Zero || !Native.IsWindow(e.ForegroundHwnd))
             {
                 WriteLog("目标窗口已不存在，跳过暂停键发送。");
-                return;
+                return false;
             }
 
             if (Native.GetForegroundWindow() != e.ForegroundHwnd)
@@ -578,17 +582,19 @@ namespace FocusFreeze
                 if (!allowRefocus)
                 {
                     WriteLog("目标当前不是前台窗口，跳过暂停键发送（避免误发给其它程序）。");
-                    return;
+                    return false;
                 }
                 if (!Native.SetForegroundWindow(e.ForegroundHwnd))
                 {
-                    WriteLog("无法把目标切回前台，未能自动解除暂停 —— 请在游戏里自行按 ESC。");
-                    return;
+                    WriteLog("无法把目标切回前台，未能发送暂停键 —— 请在游戏里自行按暂停键。");
+                    return false;
                 }
-                System.Threading.Thread.Sleep(80);
+                // 给前台切换留出时间。异步等待，不阻塞界面线程。
+                await System.Threading.Tasks.Task.Delay(80);
             }
 
             Native.TapKey((ushort)Config.PauseKeyVirtualKey);
+            return true;
         }
 
         private bool TrySuspend(RushEventArgs e, out IntPtr handle)

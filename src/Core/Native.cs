@@ -312,6 +312,13 @@ namespace FocusFreeze.Core
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool SetForegroundWindow(IntPtr hWnd);
 
+        /// <summary>
+        /// 本程序注入按键时写进 dwExtraInfo 的标记。
+        /// 低层钩子能看到这个值，用来把「自己注入的按键」和「用户真实按键」区分开 ——
+        /// 否则自己发的暂停键会被自己的钩子吞掉，游戏根本收不到。
+        /// </summary>
+        public static readonly IntPtr InjectedTag = new IntPtr(unchecked((long)0x5A6C1E00));
+
         /// <summary>敲一下某个虚拟键（按下 + 抬起）。东方系列用 DirectInput，必须走 SendInput 才能被游戏读到。</summary>
         public static void TapKey(ushort vk)
         {
@@ -330,7 +337,7 @@ namespace FocusFreeze.Core
                 wScan = 0,
                 dwFlags = up ? KEYEVENTF_KEYUP : 0u,
                 time = 0,
-                dwExtraInfo = IntPtr.Zero
+                dwExtraInfo = InjectedTag
             };
             SendInput(1, arr, Marshal.SizeOf(typeof(INPUT)));
         }

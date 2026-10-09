@@ -194,24 +194,33 @@ namespace FocusFreeze.Core
                 if (isDown || isUp)
                 {
                     Native.KBDLLHOOKSTRUCT info = Marshal.PtrToStructure<Native.KBDLLHOOKSTRUCT>(lParam);
-                    int slot = (int)(info.vkCode & 0xFF);
 
-                    long now = Stopwatch.GetTimestamp();
-                    if (StepKey(slot, isDown, now))
-                    {
-                        Interlocked.Increment(ref _keyTotal);
-                        Push(now);
-                    }
+                    // 本程序自己注入的按键（例如「发送暂停键」模式下的 ESC）：
+                    // 不计数、不吞、也不当作 ESC 安全阀 —— 否则它会被自己的钩子吞掉，
+                    // 游戏收不到暂停指令，还会被误判成用户按了 ESC 而提前结束定格。
+                    bool injected = info.dwExtraInfo == Native.InjectedTag;
 
-                    if (Interlocked.Read(ref _swallow) == 1)
+                    if (!injected)
                     {
-                        // 吞输入（定格期间）：只吞「按下」，放行「抬起」。
-                        // 若连抬起一起吞掉，前台程序会一直以为该键仍被按住，
-                        // 直到用户再按一次才解除。
-                        if (isDown)
+                        int slot = (int)(info.vkCode & 0xFF);
+
+                        long now = Stopwatch.GetTimestamp();
+                        if (StepKey(slot, isDown, now))
                         {
-                            if (info.vkCode == 0x1B) PanicRequested = true; // VK_ESCAPE 安全阀
-                            return new IntPtr(1);
+                            Interlocked.Increment(ref _keyTotal);
+                            Push(now);
+                        }
+
+                        if (Interlocked.Read(ref _swallow) == 1)
+                        {
+                            // 吞输入（定格期间）：只吞「按下」，放行「抬起」。
+                            // 若连抬起一起吞掉，前台程序会一直以为该键仍被按住，
+                            // 直到用户再按一次才解除。
+                            if (isDown)
+                            {
+                                if (info.vkCode == 0x1B) PanicRequested = true; // VK_ESCAPE 安全阀
+                                return new IntPtr(1);
+                            }
                         }
                     }
                 }
@@ -242,6 +251,11 @@ namespace FocusFreeze.Core
 
                 if (slot >= 0)
                 {
+                    // 鼠标事件目前不由本程序注入，但保持一致：带标记的事件不计不入。
+                    Native.MSLLHOOKSTRUCT minfo = Marshal.PtrToStructure<Native.MSLLHOOKSTRUCT>(lParam);
+                    if (minfo.dwExtraInfo == Native.InjectedTag)
+                        return Native.CallNextHookEx(_msHook, nCode, wParam, lParam);
+
                     long now = Stopwatch.GetTimestamp();
                     bool wheel = msg == Native.WM_MOUSEWHEEL || msg == Native.WM_MOUSEHWHEEL;
 

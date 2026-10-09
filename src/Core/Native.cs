@@ -235,6 +235,7 @@ namespace FocusFreeze.Core
         public const uint BM_CLICK = 0x00F5;
 
         public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        public static readonly IntPtr HWND_TOP = new IntPtr(0);
         public const uint SWP_NOSIZE = 0x0001;
         public const uint SWP_NOMOVE = 0x0002;
         public const uint SWP_NOACTIVATE = 0x0010;
@@ -311,6 +312,53 @@ namespace FocusFreeze.Core
         [DllImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo,
+            [MarshalAs(UnmanagedType.Bool)] bool fAttach);
+
+        /// <summary>
+        /// 可靠地把某个窗口切到前台。
+        /// 单靠 SetForegroundWindow 经常被 Windows 的前台锁定策略拒绝，
+        /// 先把自己的输入队列临时附加到当前前台线程，成功率会高得多。
+        /// </summary>
+        public static bool ForceForegroundWindow(IntPtr hwnd)
+        {
+            if (hwnd == IntPtr.Zero || !IsWindow(hwnd)) return false;
+
+            IntPtr fg = GetForegroundWindow();
+            if (fg == hwnd) return true;
+
+            uint fgThread = 0;
+            if (fg != IntPtr.Zero) fgThread = GetWindowThreadProcessId(fg, out _);
+            uint ourThread = GetCurrentThreadId();
+
+            bool attached = false;
+            try
+            {
+                if (fgThread != 0 && fgThread != ourThread)
+                    attached = AttachThreadInput(ourThread, fgThread, true);
+
+                if (!SetForegroundWindow(hwnd))
+                {
+                    // 有些情况下窗口已经被激活但未被系统确认为前台，补一次置顶。
+                    SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+                }
+                return GetForegroundWindow() == hwnd;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (attached)
+                {
+                    try { AttachThreadInput(ourThread, fgThread, false); } catch { }
+                }
+            }
+        }
 
         /// <summary>
         /// 本程序注入按键时写进 dwExtraInfo 的标记。

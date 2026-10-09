@@ -594,13 +594,15 @@ namespace FocusFreeze
                     WriteLog("目标当前不是前台窗口，跳过暂停键发送（避免误发给其它程序）。");
                     return false;
                 }
-                if (!Native.SetForegroundWindow(e.ForegroundHwnd))
+                // 用加固版切前台：单靠 SetForegroundWindow 常被系统的前台锁定策略拒绝，
+                // 切不过去的话 SendInput 就会把按键发给当前前台（比如本程序自己的窗口）。
+                if (!Native.ForceForegroundWindow(e.ForegroundHwnd))
                 {
                     WriteLog("无法把目标切回前台，未能发送暂停键 —— 请在游戏里自行按暂停键。");
                     return false;
                 }
-                // 给前台切换留出时间。异步等待，不阻塞界面线程。
-                await System.Threading.Tasks.Task.Delay(80);
+                // 给前台切换留出稳定时间，再发按键。异步等待，不阻塞界面线程。
+                await System.Threading.Tasks.Task.Delay(150);
             }
 
             // 按下 → 按住一小段 → 抬起：DirectInput 游戏靠轮询读键，

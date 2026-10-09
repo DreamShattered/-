@@ -389,10 +389,17 @@ namespace FocusFreeze
                 if (suspendSeconds < 0.2) suspendSeconds = 0.2;
                 if (overlaySeconds < suspendSeconds) overlaySeconds = suspendSeconds;
 
-                // 档案里带的实测推荐优先；未收录的程序才用全局设置。
-                FreezeMode effectiveMode = string.IsNullOrEmpty(profile.ProcessName)
-                    ? Config.FreezeMode
-                    : profile.PreferredMode;
+                // 界面上的「定格方式」是用户的明确选择，永远优先。
+                // 档案里的实测推荐只用来提示，不再覆盖用户选择 ——
+                // 否则在界面上选了「发送暂停键」，命中档案的游戏却依然会去挂起进程。
+                FreezeMode effectiveMode = Config.FreezeMode;
+                if (!string.IsNullOrEmpty(profile.ProcessName) && profile.PreferredMode != effectiveMode)
+                {
+                    WriteLog("提示：" + profile.ProcessName + " 的实测推荐定格方式是「"
+                             + (profile.PreferredMode == FreezeMode.PauseKey ? "发送暂停键" : "挂起进程")
+                             + "」，当前按你的设置使用「"
+                             + (effectiveMode == FreezeMode.PauseKey ? "发送暂停键" : "挂起进程") + "」。");
+                }
 
                 if (!string.IsNullOrEmpty(profile.DisplayName))
                 {
@@ -413,6 +420,7 @@ namespace FocusFreeze
                     suspended = TrySuspend(e, out handle);
                 }
                 tSuspend = sw.ElapsedMilliseconds;
+                if (_logFile != null) WriteLog("[计时] 挂起完成 " + tSuspend + " ms");
 
                 // 遮挡层先铺（盖住游戏），素材再显示在它上面。
                 if (Config.Cover != CoverMode.None) _cover.ShowCover(Config, coverShot);
@@ -444,6 +452,7 @@ namespace FocusFreeze
 
                 LastTrigger = DateTime.Now;
                 tShow = sw.ElapsedMilliseconds;
+                if (_logFile != null) WriteLog("[计时] 覆盖层就绪 " + tShow + " ms");
 
                 string proc = string.IsNullOrEmpty(e.ForegroundProcess) ? "(未知)" : e.ForegroundProcess;
                 WriteLog(string.Format("[{0:HH:mm:ss}] 触发 {1} 次 / {2} ms | 前台 {3} (pid {4}) | 冻结 {5}",
@@ -461,6 +470,7 @@ namespace FocusFreeze
                     await System.Threading.Tasks.Task.Delay(50);
                 }
                 tFreeze = sw.ElapsedMilliseconds;
+                if (_logFile != null) WriteLog("[计时] 冻结等待结束 " + tFreeze + " ms");
 
                 // 阶段二：先把游戏放开、恢复计数，图片与音频继续留在屏幕上。
                 if (handle != IntPtr.Zero)
@@ -470,6 +480,7 @@ namespace FocusFreeze
                     ForceRedraw(e.ForegroundHwnd);
                 }
                 tResume = sw.ElapsedMilliseconds;
+                if (_logFile != null) WriteLog("[计时] 恢复完成 " + tResume + " ms");
 
                 // 遮挡层的撤除时机：默认等到展示结束（音频放完再撤），
                 // 否则游戏已恢复、音频还在播时会被看到局势，防作弊就失效了。

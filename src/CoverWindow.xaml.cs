@@ -23,12 +23,9 @@ namespace FocusFreeze
     /// </summary>
     public partial class CoverWindow : Window
     {
-        private readonly BlurEffect _blur = new BlurEffect { Radius = 28, RenderingBias = RenderingBias.Performance };
-
         public CoverWindow()
         {
             InitializeComponent();
-            Shot.Effect = _blur;
             SourceInitialized += delegate { ApplyNoActivateStyles(); };
         }
 
@@ -90,6 +87,14 @@ namespace FocusFreeze
                         display = ScreenCapturer.Downscale(shot, cfg.PixelBlockSize);
                         pixelate = true;
                     }
+                    else if (cfg.Cover == CoverMode.Blur)
+                    {
+                        // 模糊同样用「降采样 + 双线性放大」实现，而不是全屏 BlurEffect：
+                        // 一次性开销小得多，而且抹掉了高频细节 —— 录屏编码器不必再为
+                        // 满屏噪声付出数倍码率，这是「触发期间录制卡顿」的主因。
+                        int block = Math.Max(2, (int)Math.Round(cfg.BlurRadius / 3.5));
+                        display = ScreenCapturer.Downscale(shot, block);
+                    }
                     else
                     {
                         display = shot;
@@ -100,8 +105,10 @@ namespace FocusFreeze
             if (display != null)
             {
                 Shot.Source = display;
+                // 降采样后的位图用 Linear 放大即得到平滑的模糊 / 马赛克；
+                // HighQuality(Fant) 对这种全屏位图开销很大，这里不需要。
                 RenderOptions.SetBitmapScalingMode(Shot,
-                    pixelate ? BitmapScalingMode.NearestNeighbor : BitmapScalingMode.HighQuality);
+                    pixelate ? BitmapScalingMode.NearestNeighbor : BitmapScalingMode.Linear);
                 Shot.Visibility = Visibility.Visible;
             }
             else
@@ -109,8 +116,6 @@ namespace FocusFreeze
                 Shot.Source = null;
                 Shot.Visibility = Visibility.Collapsed;
             }
-
-            _blur.Radius = cfg.Cover == CoverMode.Blur ? cfg.BlurRadius : 0.0;
 
             if (cfg.Cover == CoverMode.Solid)
             {

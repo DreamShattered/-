@@ -360,7 +360,11 @@ namespace FocusFreeze
                 bool usePauseKey = effectiveMode == FreezeMode.PauseKey;
                 if (usePauseKey)
                 {
-                    _pausedByKey = await SendPauseKey(e, false);
+                    // 允许切回目标再发：从「检测到触发」到真正发键之间有几十到几百毫秒，
+                    // 期间本程序自己的窗口（或遮挡层）有可能把前台抢走，
+                    // 这时若直接放弃发送，暂停键就永远发不进游戏。
+                    // 目标窗口来自触发瞬间的捕获，且只对它切前台，不会误发给无关程序。
+                    _pausedByKey = await SendPauseKey(e, true);
                     if (!_pausedByKey)
                     {
                         WriteLog("暂停键未能发送，本次只展示素材、不对游戏进程做任何干预。");

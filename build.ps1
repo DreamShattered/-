@@ -33,6 +33,20 @@ if ($Debug) {
 $out = Join-Path $root 'publish'
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 
+# Bail out with a readable message if the published exe is locked (program running).
+$existing = Get-ChildItem $out -Filter '*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($existing) {
+    $locked = $false
+    try { $fs = [System.IO.File]::Open($existing.FullName, 'Open', 'ReadWrite', 'None'); $fs.Close() }
+    catch { $locked = $true }
+    if ($locked) {
+        Write-Host ('Publish aborted: ' + $existing.FullName) -ForegroundColor Yellow
+        Write-Host 'That file is locked because the program is running. Close it and publish again.' -ForegroundColor Yellow
+        Write-Host 'The exe was NOT updated; nothing else was touched.' -ForegroundColor Yellow
+        exit 1
+    }
+}
+
 # Remove only the old main program; keep the usage doc / config.json next to it.
 Get-ChildItem $out -Filter '*.exe' -ErrorAction SilentlyContinue | Remove-Item -Force
 

@@ -130,6 +130,13 @@ namespace FocusFreeze.Core
         /// <summary>恢复后请求目标窗口重绘（部分 D3D 程序挂起恢复后画面不刷新）。</summary>
         public bool ForceRedrawAfterResume { get; set; } = true;
 
+        /// <summary>
+        /// 恢复后是否额外发送一个「尺寸不变的 WM_SIZE」。
+        /// 它会促使游戏重建 D3D 交换链，能修好个别程序恢复后画面停死的问题，
+        /// 但代价是恢复瞬间一次短促掉帧 —— 同时在录屏时尤其明显，故默认关闭。
+        /// </summary>
+        public bool ForceRedrawStrong { get; set; } = false;
+
         /// <summary>触发时遮挡前台画面的方式。</summary>
         public CoverMode Cover { get; set; } = CoverMode.None;
 

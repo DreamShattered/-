@@ -23,7 +23,7 @@
             <StackPanel>
                 <Image x:Name="Pic"
                        Stretch="Uniform"
-                       RenderOptions.BitmapScalingMode="HighQuality" />
+                       RenderOptions.BitmapScalingMode="Linear" />
                 <TextBlock x:Name="Caption"
                            Margin="0,14,0,4"
                            FontSize="22"

@@ -14,6 +14,7 @@ config.json
 config.*.json
 assets/
 selftest.txt
+run.log
 probe.txt
 suspendprobe.txt
 swallowprobe.txt

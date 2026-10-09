@@ -118,10 +118,19 @@ namespace FocusFreeze
         private readonly List<IntPtr> _suspendedHandles = new List<IntPtr>();
         private bool _busy;
 
+        /// <summary>
+        /// 测试模式下把日志同时落盘（无人值守取回结果用）。平时为 null，不写任何文件。
+        /// </summary>
+        private static string _logFile;
+
         public static void WriteLog(string line)
         {
             Action<string> h = LogLine;
             if (h != null) h(line);
+            if (_logFile != null)
+            {
+                try { File.AppendAllText(_logFile, line + Environment.NewLine); } catch { }
+            }
         }
 
         protected override void OnStartup(StartupEventArgs e)
@@ -211,6 +220,9 @@ namespace FocusFreeze
             // --triggertest：启动 2 秒后自动触发一次完整流程，用于验证遮挡层/提示图/音频。
             if (e.Args != null && Array.Exists(e.Args, a => string.Equals(a, "--triggertest", StringComparison.OrdinalIgnoreCase)))
             {
+                _logFile = Path.Combine(baseDir, "run.log");
+                try { File.Delete(_logFile); } catch { }
+                WriteLog("测试模式：日志同时写入 " + _logFile);
                 System.Windows.Threading.DispatcherTimer t = new System.Windows.Threading.DispatcherTimer();
                 t.Interval = TimeSpan.FromSeconds(2);
                 t.Tick += async delegate
@@ -311,6 +323,11 @@ namespace FocusFreeze
 
             IntPtr handle = IntPtr.Zero;
             bool suspended = false;
+
+            // 各阶段耗时。触发期间任何一次长阻塞都会让同时运行的录屏掉帧，
+            // 这些数字用来直接定位是谁在拖时间。
+            Stopwatch sw = Stopwatch.StartNew();
+            long tPick = 0, tSuspend = 0, tShow = 0, tFreeze = 0, tResume = 0;
             try
             {
                 if (Config.SwallowInput) Engine.SwallowInput = true;
@@ -346,6 +363,7 @@ namespace FocusFreeze
                 string measuredTarget = Config.Kind == AssetKind.Video ? videoPath : audioPath;
                 double audioBaseSeconds = Config.OverlaySeconds;
                 double? measured = await GetDurationAsync(measuredTarget, 1500);
+                tPick = sw.ElapsedMilliseconds;
                 if (measured.HasValue && measured.Value > 0.1)
                 {
                     audioBaseSeconds = measured.Value;
@@ -394,6 +412,7 @@ namespace FocusFreeze
                 {
                     suspended = TrySuspend(e, out handle);
                 }
+                tSuspend = sw.ElapsedMilliseconds;
 
                 // 遮挡层先铺（盖住游戏），素材再显示在它上面。
                 if (Config.Cover != CoverMode.None) _cover.ShowCover(Config, coverShot);
@@ -424,6 +443,7 @@ namespace FocusFreeze
                 }
 
                 LastTrigger = DateTime.Now;
+                tShow = sw.ElapsedMilliseconds;
 
                 string proc = string.IsNullOrEmpty(e.ForegroundProcess) ? "(未知)" : e.ForegroundProcess;
                 WriteLog(string.Format("[{0:HH:mm:ss}] 触发 {1} 次 / {2} ms | 前台 {3} (pid {4}) | 冻结 {5}",
@@ -440,6 +460,7 @@ namespace FocusFreeze
                     }
                     await System.Threading.Tasks.Task.Delay(50);
                 }
+                tFreeze = sw.ElapsedMilliseconds;
 
                 // 阶段二：先把游戏放开、恢复计数，图片与音频继续留在屏幕上。
                 if (handle != IntPtr.Zero)
@@ -448,6 +469,7 @@ namespace FocusFreeze
                     handle = IntPtr.Zero;
                     ForceRedraw(e.ForegroundHwnd);
                 }
+                tResume = sw.ElapsedMilliseconds;
 
                 // 遮挡层的撤除时机：默认等到展示结束（音频放完再撤），
                 // 否则游戏已恢复、音频还在播时会被看到局势，防作弊就失效了。
@@ -503,6 +525,11 @@ namespace FocusFreeze
                 Engine.ResetWindow();
                 Engine.SwallowInput = false;
                 _busy = false;
+
+                // 每次触发只打一行，用来定位卡顿出在哪个阶段。
+                WriteLog(string.Format(
+                    "[计时] 累计 选素材+测时长 {0} ms | 挂起 {1} ms | 上覆盖层 {2} ms | 冻结结束 {3} ms | 恢复 {4} ms | 总计 {5} ms",
+                    tPick, tSuspend, tShow, tFreeze, tResume, sw.ElapsedMilliseconds));
             }
         }
 
@@ -638,17 +665,34 @@ namespace FocusFreeze
             }
         }
 
-        /// <summary>
-        /// 恢复后促使目标窗口重绘。部分 D3D 程序挂起恢复后画面会停住不动，
-        /// 这里先请求失效重绘，再补一个「尺寸不变的 WM_SIZE」让交换链重建，
-        /// 两者都不会改变窗口尺寸与位置。
-        /// </summary>
+        /// <summary>恢复后促使目标窗口重绘（异步执行，不阻塞触发流程）。详见 DoForceRedraw。</summary>
         private void ForceRedraw(IntPtr hwnd)
         {
             if (!Config.ForceRedrawAfterResume) return;
-            if (hwnd == IntPtr.Zero || !Native.IsWindow(hwnd)) return;
+            if (hwnd == IntPtr.Zero) return;
+
+            // 推迟到 UI 空闲时再做：恢复的这一瞬间正是最敏感的时刻，
+            // 在这里同步阻塞（RDW_UPDATENOW / SendMessage）会直接变成掉帧。
+            Dispatcher.BeginInvoke(new Action(() => DoForceRedraw(hwnd)),
+                                   System.Windows.Threading.DispatcherPriority.Background);
+        }
+
+        /// <summary>
+        /// 恢复后促使目标窗口重绘。部分 D3D 程序挂起恢复后画面会停住不动。
+        ///
+        /// 轻量做法（默认）：只请求失效，不阻塞等待，也不改动窗口尺寸 ——
+        /// 原来的 RDW_UPDATENOW 会同步重绘整棵窗口树，WM_SIZE 会让游戏重建
+        /// D3D 交换链，两者都会在恢复瞬间造成明显掉帧，同时开着录屏时尤其明显。
+        ///
+        /// 强力做法（ForceRedrawStrong = true）：额外补一个「尺寸不变的 WM_SIZE」，
+        /// 能修复画面停死，代价就是一次短促的掉帧。
+        /// </summary>
+        private void DoForceRedraw(IntPtr hwnd)
+        {
             try
             {
+                if (!Native.IsWindow(hwnd)) return;
+
                 Native.RECT r;
                 if (!Native.GetWindowRect(hwnd, out r)) return;
                 int w = r.Right - r.Left;
@@ -656,10 +700,13 @@ namespace FocusFreeze
                 if (w <= 0 || h <= 0) return;
 
                 Native.RedrawWindow(hwnd, IntPtr.Zero, IntPtr.Zero,
-                    Native.RDW_INVALIDATE | Native.RDW_UPDATENOW | Native.RDW_ALLCHILDREN);
+                    Native.RDW_INVALIDATE | Native.RDW_ALLCHILDREN);
 
-                int lp = ((h & 0xFFFF) << 16) | (w & 0xFFFF);
-                Native.SendMessageW(hwnd, 0x0005 /* WM_SIZE */, IntPtr.Zero, new IntPtr(lp));
+                if (Config.ForceRedrawStrong)
+                {
+                    int lp = ((h & 0xFFFF) << 16) | (w & 0xFFFF);
+                    Native.SendMessageW(hwnd, 0x0005 /* WM_SIZE */, IntPtr.Zero, new IntPtr(lp));
+                }
             }
             catch
             {
